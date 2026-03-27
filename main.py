@@ -28,22 +28,14 @@ def list_quotes(request: Request, search: str = None, status: str = None):
     if status and status != "Todas":
         query = query.eq("status", status)
 
-   response = query.order("date", desc=True).execute()
+    response = query.order("date", desc=True).execute()
+    quotes = response.data if response and response.data else []
 
-if not response or not response.data:
-    quotes = []
-else:
-    quotes = response.data
+    # Obtener todos los items de todas las cotizaciones en una sola consulta
+    items_response = supabase.table("items").select("*").execute()
+    all_items = items_response.data if items_response and items_response.data else []
 
-    # ✅ Obtener todos los items de todas las cotizaciones en una sola consulta
- items_response = supabase.table("items").select("*").execute()
-
-if not items_response or not items_response.data:
-    all_items = []
-else:
-    all_items = items_response.data
-
-    # ✅ Agrupar por quote_id usando defaultdict
+    # Agrupar por quote_id usando defaultdict
     items_por_cotizacion = defaultdict(list)
     for item in all_items:
         items_por_cotizacion[item["quote_id"]].append(item)
@@ -53,7 +45,6 @@ else:
     for q in quotes:
         q["folio"] = f"SE{800 + q['id']:05d}"
 
-        # Formateo de fecha
         if isinstance(q.get("date"), str):
             try:
                 fecha = datetime.fromisoformat(q["date"])
@@ -63,10 +54,8 @@ else:
         else:
             q["formatted_date"] = "Sin fecha"
 
-        # ✅ Asociar los items ya agrupados
         q["servicios"] = items_por_cotizacion[q["id"]]
 
-        # 🔍 Lógica del buscador
         if search:
             search_lower = search.lower()
             cliente_ok = search_lower in q["client_name"].lower()
