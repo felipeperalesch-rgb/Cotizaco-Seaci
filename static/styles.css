@@ -1,0 +1,72 @@
+@media print {
+  /* Elimina márgenes del navegador */
+  @page {
+    margin: 0;
+  }
+
+  /* Oculta elementos innecesarios */
+  .no-print,
+  nav,
+  .navbar,
+  .navbar * {
+    display: none !important;
+  }
+
+  /* Ajusta el body para impresión */
+  body {
+    padding: 0;
+    margin: 0;
+    color: #000;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ocupa toda la página al imprimir */
+  main.print-container {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .card {
+    border: none;
+    box-shadow: none;
+    page-break-inside: avoid;
+  }
+
+  .card-body {
+    padding: 2rem !important;
+  }
+
+  /* Asegura que las tablas no se corten entre páginas */
+  table {
+    page-break-inside: auto;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  tr, td, th {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+    color: #000;
+  }
+
+  /* Oculta bordes extraños */
+  .table td,
+  .table th {
+    border-color: #000 !important;
+  }
+
+  /* Elimina botones */
+  .btn,
+  .btn * {
+    display: none !important;
+  }
+
+  /* Ajustes finales */
+  .total-box {
+    margin-top: 20px;
+  }
+}

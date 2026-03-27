@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Cotizaciones{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="m-0">Cotizaciones</h3>
+  <a href="/quotes/new" class="btn btn-primary">+ Nueva cotización</a>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+  {% for st in ['Todas', 'En proceso', 'Enviada', 'Finalizada', 'Cancelada'] %}
+    <li class="nav-item">
+      <a class="nav-link {% if status == st %}active{% endif %}" 
+        href="/?status={{ st }}{% if search %}&search={{ search }}{% endif %}">
+        {{ st }}
+      </a>
+    </li>
+  {% endfor %}
+</ul>
+
+<!-- 🔍 Formulario de búsqueda -->
+<form method="get" action="/" class="mb-3 d-flex gap-2">
+  <input type="text" name="search" class="form-control" placeholder="Buscar en descripción" value="{{ search or '' }}">
+  <button type="submit" class="btn btn-primary">Buscar</button>
+  {% if search %}
+    <a href="/" class="btn btn-outline-secondary">Limpiar</a>
+  {% endif %}
+</form>
+
+{% if quotes|length == 0 %}
+  <div class="alert alert-info">Aún no hay cotizaciones. Crea la primera.</div>
+{% else %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Folio</th>
+          <th>Fecha</th>
+          <th>Cliente</th>
+          <th>Empresa</th>
+          <th>Servicios</th>
+          <th>Total</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in quotes %}
+        <tr>
+          <td>{{ q.folio }}</td>
+          <td>{{ q.formatted_date }}</td>
+          <td>{{ q.client_name }}</td>
+          <td>{{ q.client_company or "-" }}</td>
+          <td>
+          {% if q.servicios and q.servicios|length > 0 %}
+            {{ q.servicios[0].description[:60] }}{% if q.servicios[0].description|length > 60 %}...{% endif %}
+          {% else %}
+            <em>Sin servicios</em>
+          {% endif %}
+
+
+          </td>
+          <td><strong>{{ q.currency }} {{ "{:,.2f}".format(q.total) }}</strong></td>
+          <td>
+            <!-- Botón Ver -->
+            <a class="btn btn-sm btn-outline-secondary" href="/quotes/{{ q.id }}">Ver</a>
+
+            <!-- Botón Eliminar -->
+            <form method="post" action="/quotes/{{ q.id }}/delete" style="display:inline;" onsubmit="return confirm('¿Seguro que quieres eliminar la cotización {{ q.folio }}?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+            </form>
+
+            <!-- Select para cambiar el status -->
+            <form method="post" action="/quotes/{{ q.id }}/status" style="display:inline;">
+              <input type="hidden" name="quote_id" value="{{ q.id }}">
+              <select name="status" class="form-select form-select-sm d-inline-block w-auto ms-2" onchange="this.form.submit()">
+                <option value="" {% if not q.status %}selected{% endif %}>-- Seleccionar --</option>
+                <option value="En proceso" {% if q.status == 'En proceso' %}selected{% endif %}>En proceso</option>
+                <option value="Finalizada" {% if q.status == 'Finalizada' %}selected{% endif %}>Finalizada</option>
+                <option value="Enviada" {% if q.status == 'Enviada' %}selected{% endif %}>Enviada</option>
+                <option value="Cancelada" {% if q.status == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+              </select>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

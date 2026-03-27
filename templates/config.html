@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<h3>Configuración de Empresa / Emisor</h3>
+
+<form method="post" action="/configuracion">
+  <div class="mb-3">
+    <label for="business_name" class="form-label">Nombre de la empresa</label>
+    <input type="text" class="form-control" id="business_name" name="business_name" value="{{ settings.business_name }}">
+  </div>
+
+  <div class="mb-3">
+    <label for="rfc_phone_email" class="form-label">RFC / Teléfono / Email</label>
+    <input type="text" class="form-control" id="rfc_phone_email" name="rfc_phone_email" value="{{ settings.rfc_phone_email }}">
+  </div>
+
+  <div class="mb-3">
+    <label for="address" class="form-label">Dirección</label>
+    <textarea class="form-control" id="address" name="address" rows="3">{{ settings.address }}</textarea>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Guardar</button>
+  <a href="/" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}

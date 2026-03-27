@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Cotización #{{ quote.number }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center no-print">
+  <a href="/" class="btn btn-outline-secondary">← Volver</a>
+  <div class="d-flex gap-2">
+    <a href="/quotes/{{ quote.id }}/pdf" class="btn btn-outline-primary">⬇ Descargar PDF</a>
+    <a href="/quotes/{{ quote.id }}/edit" class="btn btn-outline-warning">✎ Editar</a>
+    <button onclick="window.print()" class="btn btn-outline-primary">Imprimir / PDF</button>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-6">
+      <img src="{{ request.url_for('static', path='logo.png') }}" alt="Logo" style="height: 120px; margin-right: 10px;">
+      <div><strong>RFC: PECF870731DA9</strong></div>
+      <div><STRong>Email: seaci.ventas@gmail.com</STRong></div>
+      
+</div>
+
+      <div class="col-md-6 text-md-end">
+        <h2 class="m-0">COTIZACIÓN</h2>
+        <div><strong>Folio:</strong> {{ quote.folio }}</div>
+        <div><strong>Fecha:</strong> {{ quote.formatted_date }}</div>
+        <div><strong>Moneda:</strong> {{ quote.currency }}</div>
+      </div>
+    </div>
+    <hr>
+    <div class="row">
+      <div class="col-md-6">
+        <h5>Cliente</h5>
+        <div><strong>{{ quote.client_name }}</strong></div>
+        {% if quote.client_company %}<div>{{ quote.client_company }}</div>{% endif %}
+        {% if quote.client_email %}<div>{{ quote.client_email }}</div>{% endif %}
+        {% if quote.client_phone %}<div>{{ quote.client_phone }}</div>{% endif %}
+        {% if quote.client_address %}<div>{{ quote.client_address }}</div>{% endif %}
+      </div>
+      <div class="col-md-6">
+        {% if quote.notes %}
+        <h5>Notas</h5>
+        <div style="white-space: pre-wrap;">{{ quote.notes }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Descripción</th>
+            <th>Cant.</th>
+            <th>Unidad</th>
+            <th>Precio unitario</th>
+            <th>Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td style="white-space: pre-wrap;">{{ it.description }}</td>
+            <td>{{ "%.2f"|format(it.quantity) }}</td>
+            <td>{{ it.unit }}</td>
+            <td>{{ quote.currency }} {{ "{:,.2f}".format(it.unit_price) }}</td>
+            <td>{{ quote.currency }} {{ "{:,.2f}".format(it.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ms-auto total-box">
+      <div class="d-flex justify-content-between"><span>Subtotal:</span><span>{{ quote.currency }} {{  "{:,.2f}".format(quote.subtotal) }}</span></div>
+      <div class="d-flex justify-content-between"><span>Descuento ({{ "%.2f"|format(quote.discount_rate*100) }}%):</span><span>{{ quote.currency }} {{  "{:,.2f}".format(quote.discount_amount) }}</span></div>
+      <div class="d-flex justify-content-between"><span>Impuestos ({{ "%.2f"|format(quote.tax_rate*100) }}%):</span><span>{{ quote.currency }} {{"{:,.2f}".format(quote.tax_amount) }}</span></div>
+      <hr>
+      <div class="d-flex justify-content-between fs-5"><strong>Total:</strong><strong>{{ quote.currency }} {{"{:,.2f}".format(quote.total) }}</strong>
+    </div>
+
+    <div class="footer-note mt-4">
+    {% if quote.validity %}
+    <div><strong>Vigencia:</strong> {{ quote.validity }}</div>
+    {% endif %}
+    {% if quote.payment_terms %}
+    <div><strong>Condiciones de pago:</strong> {{ quote.payment_terms }}</div>
+    {% endif %}
+    {% if quote.warranty %}
+    <div><strong>Garantía:</strong> {{ quote.warranty }}</div>
+    {% endif %}
+    </div>
+
+    
+  </div>
+</div>
+{% endblock %}

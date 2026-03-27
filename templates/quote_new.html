@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Nueva cotización{% endblock %}
+{% block content %}
+<h3>Nueva cotización</h3>
+
+<form method="post" action="/quotes/create">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Datos del cliente</div>
+        <div class="card-body">
+          <div class="mb-2">
+          <label class="form-label">Nombre del cliente</label>
+            <input name="client_name" id="client_name" class="form-control" list="client_names" autocomplete="off" required>
+            <datalist id="client_names"></datalist>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Empresa (opcional)</label>
+            <input name="client_company" id="client_company" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Email (opcional)</label>
+            <input type="email" name="client_email" id="client_email" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Teléfono (opcional)</label>
+            <input name="client_phone" id="client_phone" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Dirección (opcional)</label>
+            <textarea name="client_address" id="client_address" class="form-control" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">Datos de la cotización</div>
+        <div class="card-body">
+          <div class="mb-2">
+            <label class="form-label">Moneda</label>
+            <select name="currency" class="form-select">
+              <option value="MXN" selected>MXN</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">IVA (%)</label>
+            <input type="number" step="0.01" name="tax_rate" value="16" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Descuento global (%)</label>
+            <input type="number" step="0.01" name="discount_rate" value="0" class="form-control">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Notas</label>
+            <textarea name="notes" class="form-control" rows="2" placeholder="Condiciones, tiempos de entrega, vigencia, garantías, etc."></textarea>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Vigencia</label>
+            <input name="validity" class="form-control" value="7 dias">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Condiciones de pago</label>
+            <input name="payment_terms" class="form-control" placeholder="50% anticipo, 50% contra entrega">
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Garantía</label>
+            <input name="warranty" class="form-control" placeholder="Contra defectos de instalación por 90 días">
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Servicios</span>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Agregar servicio</button>
+    </div>
+    <div class="card-body table-responsive">
+      <table class="table table-bordered align-middle" id="itemsTable">
+        <thead>
+          <tr>
+            <th style="min-width: 260px;">Descripción</th>
+            <th>Cantidad</th>
+            <th>Unidad</th>
+            <th>Precio unitario</th>
+            <th>Importe</th>
+            <th class="no-print"></th>
+          </tr>
+        </thead>
+        <tbody id="itemsBody"></tbody>
+      </table>
+      <div class="text-end">
+        <div class="total-box">
+          <div class="d-flex justify-content-between"><span>Subtotal:</span><span id="subtotalLabel">0.00</span></div>
+          <div class="d-flex justify-content-between"><span>Descuento:</span><span id="discountLabel">0.00</span></div>
+          <div class="d-flex justify-content-between"><span>Impuestos:</span><span id="taxLabel">0.00</span></div>
+          <hr>
+          <div class="d-flex justify-content-between fs-5"><strong>Total:</strong><strong id="totalLabel">0.00</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+    <button class="btn btn-success">Guardar cotización</button>
+  </div>
+
+  <!-- hidden input to carry serialized items -->
+  <input type="hidden" name="items_json" id="items_json">
+  <datalist id="unidades">
+  <option value="Pieza">
+  <option value="Metro">
+  <option value="kg">  
+  <option value="litro">  
+  <option value="Servicio"> 
+  </datalist>
+
+
+</form>
+
+<script>
+let itemId = 0;
+function addRow(prefill) {
+  const tbody = document.getElementById('itemsBody');
+  const tr = document.createElement('tr');
+  tr.className = "item-row";
+  const pid = itemId++;
+  tr.innerHTML = `
+    <td><textarea class="form-control desc" rows="2" placeholder="Descripción del servicio"></textarea></td>
+    <td style="width:140px;"><input type="number" step="0.01" class="form-control qty" value="1"></td>
+    <td style="width:140px;"><input class="form-control unit" list="unidades" placeholder="ej. servicio, hr, día"></td>
+    <td style="width:180px;"><input type="number" step="0.01" class="form-control price" value="0"></td>
+    <td style="width:160px;"><input type="text" class="form-control amount" value="0.00" readonly></td>
+    <td class="no-print" style="width:60px;"><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  if (prefill) {
+    tr.querySelector('.desc').value = prefill.description || "";
+    tr.querySelector('.qty').value = prefill.quantity || 1;
+    tr.querySelector('.unit').value = prefill.unit || "";
+    tr.querySelector('.price').value = prefill.unit_price || 0;
+  }
+  attachInputs(tr);
+  recalc();
+}
+function removeRow(btn) {
+  btn.closest('tr').remove();
+  recalc();
+}
+function attachInputs(tr) {
+  tr.querySelectorAll('.qty,.price,.desc,.unit').forEach(el => {
+    el.addEventListener('input', recalc);
+  });
+}
+function getTaxRate() {
+  return numberOrZero(document.querySelector('input[name="tax_rate"]').value) / 100.0;
+}
+function getDiscountRate() {
+  return numberOrZero(document.querySelector('input[name="discount_rate"]').value) / 100.0;
+}
+function recalc() {
+  const rows = document.querySelectorAll('#itemsBody tr');
+  let subtotal = 0;
+  const items = [];
+  rows.forEach(r => {
+    const desc = r.querySelector('.desc').value.trim();
+    const qty = numberOrZero(r.querySelector('.qty').value);
+    const unit = r.querySelector('.unit').value;
+    const price = numberOrZero(r.querySelector('.price').value);
+    const amount = qty * price;
+    subtotal += amount;
+    r.querySelector('.amount').value = amount.toFixed(2);
+    if (desc || qty || unit || price) {
+      items.push({ description: desc, quantity: qty, unit: unit, unit_price: price, amount: amount });
+    }
+  });
+  const discount = subtotal * getDiscountRate();
+  const taxedBase = Math.max(subtotal - discount, 0);
+  const tax = taxedBase * getTaxRate();
+  const total = taxedBase + tax;
+
+  document.getElementById('subtotalLabel').innerText = subtotal.toFixed(2);
+  document.getElementById('discountLabel').innerText = discount.toFixed(2);
+  document.getElementById('taxLabel').innerText = tax.toFixed(2);
+  document.getElementById('totalLabel').innerText = total.toFixed(2);
+  document.getElementById('items_json').value = JSON.stringify(items);
+}
+// initialize
+addRow();
+document.querySelector('input[name="tax_rate"]').addEventListener('input', recalc);
+document.querySelector('input[name="discount_rate"]').addEventListener('input', recalc);
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  fetch("/api/clientes")
+    .then(response => response.json())
+    .then(data => {
+      const datalist = document.getElementById("client_names");
+      const nameInput = document.getElementById("client_name");
+
+      const clients = data;
+
+      // Cargar nombres únicos
+      const names = [...new Set(clients.map(c => c.name))];
+      datalist.innerHTML = names.map(n => `<option value="${n}">`).join("");
+
+      // Autocompletar al seleccionar un cliente
+      nameInput.addEventListener("change", function () {
+        const selected = clients.find(c => c.name === nameInput.value);
+        if (selected) {
+          document.getElementById("client_company").value = selected.company || "";
+          document.getElementById("client_email").value = selected.email || "";
+          document.getElementById("client_phone").value = selected.phone || "";
+          document.getElementById("client_address").value = selected.address || "";
+        }
+      });
+    });
+});
+</script>
+
+{% endblock %}
