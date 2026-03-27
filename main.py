@@ -80,7 +80,11 @@ def list_quotes(request: Request, search: str = None, status: str = None):
 
 @app.get("/quotes/new", response_class=HTMLResponse)
 def new_quote_form(request: Request):
-    return templates.TemplateResponse("quote_new.html", {"request": request})
+    return templates.TemplateResponse(
+    request,
+    "quote_new.html",
+    {}
+)
 
 @app.get("/quotes/{quote_id}/edit", response_class=HTMLResponse)
 def edit_quote(quote_id: int, request: Request):
@@ -96,11 +100,14 @@ def edit_quote(quote_id: int, request: Request):
     # Serializar los items para JS
     items_json = json.dumps(items)
 
-    return templates.TemplateResponse("quote_edit.html", {
-        "request": request,
+    return templates.TemplateResponse(
+    request,
+    "quote_edit.html",
+    {
         "quote": quote,
         "items_json": items_json
-    })
+    }
+)
 @app.post("/quotes/{quote_id}/update")
 async def update_quote(
     quote_id: int,
@@ -234,12 +241,15 @@ def view_quote(quote_id: int, request: Request):
     else:
         quote["formatted_date"] = "Sin fecha"
 
-    return templates.TemplateResponse("quote_view.html", {
-        "request": request,
+    return templates.TemplateResponse(
+    request,
+    "quote_view.html",
+    {
         "quote": quote,
         "items": items,
         "settings": {}
-    })
+    }
+)
 
 
 @app.get("/quotes/{quote_id}/pdf")
