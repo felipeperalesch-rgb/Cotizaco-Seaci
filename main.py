@@ -65,12 +65,15 @@ def list_quotes(request: Request, search: str = None, status: str = None):
         else:
             filtered_quotes.append(q)
 
-    return templates.TemplateResponse("index.html", {
-        "request": request,
+    return templates.TemplateResponse(
+    request,
+    "index.html",
+    {
         "quotes": filtered_quotes,
         "search": search,
         "status": status or "Todas"
-    })
+    }
+)
 
 
 
