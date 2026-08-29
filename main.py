@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client, Client
@@ -8,6 +8,33 @@ from datetime import datetime
 from weasyprint import HTML as WeasyHTML
 import os
 import json
+import base64
+import hmac
+
+# Acceso al cotizador. Configura estos dos valores como variables secretas en Render.
+ADMIN_USER = os.getenv("ADMIN_USER", "").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+
+def basic_auth_is_valid(authorization: str | None) -> bool:
+    """Valida el encabezado HTTP Basic sin guardar credenciales en el código."""
+    if not ADMIN_USER or not ADMIN_PASSWORD or not authorization:
+        return False
+
+    try:
+        scheme, encoded_credentials = authorization.split(" ", 1)
+        if scheme.lower() != "basic":
+            return False
+
+        decoded = base64.b64decode(encoded_credentials, validate=True).decode("utf-8")
+        username, password = decoded.split(":", 1)
+    except (ValueError, UnicodeDecodeError):
+        return False
+
+    return (
+        hmac.compare_digest(username.encode("utf-8"), ADMIN_USER.encode("utf-8"))
+        and hmac.compare_digest(password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8"))
+    )
 
 # Configura tus credenciales de Supabase (usa variables de entorno o colócalas directamente)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://groeopgrcwrdwezosihk.supabase.co")
@@ -18,6 +45,41 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = FastAPI(title="Cotizador Supabase")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+
+@app.middleware("http")
+async def protect_cotizador(request: Request, call_next):
+    # Render puede consultar esta ruta para verificar que el servicio siga activo.
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    if not ADMIN_USER or not ADMIN_PASSWORD:
+        return PlainTextResponse(
+            "Falta configurar ADMIN_USER y ADMIN_PASSWORD en Render.",
+            status_code=503,
+        )
+
+    if not basic_auth_is_valid(request.headers.get("Authorization")):
+        return PlainTextResponse(
+            "Acceso restringido al Cotizador SEACI.",
+            status_code=401,
+            headers={
+                "WWW-Authenticate": 'Basic realm="Cotizador SEACI", charset="UTF-8"',
+                "Cache-Control": "no-store",
+            },
+        )
+
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
 from collections import defaultdict
 
