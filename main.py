@@ -9,32 +9,148 @@ from weasyprint import HTML as WeasyHTML
 import os
 import json
 import base64
+import hashlib
+import html
 import hmac
+import time
+from urllib.parse import quote
 
-# Acceso al cotizador. Configura estos dos valores como variables secretas en Render.
+# Acceso al cotizador. Configura estos valores como variables secretas en Render.
 ADMIN_USER = os.getenv("ADMIN_USER", "").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+SESSION_COOKIE = "seaci_session"
+SESSION_MAX_AGE = 12 * 60 * 60
 
 
-def basic_auth_is_valid(authorization: str | None) -> bool:
-    """Valida el encabezado HTTP Basic sin guardar credenciales en el código."""
-    if not ADMIN_USER or not ADMIN_PASSWORD or not authorization:
+def _session_key() -> bytes:
+    # Cambiar la contraseña invalida automáticamente todas las sesiones abiertas.
+    return hashlib.sha256(
+        f"seaci-session:{ADMIN_USER}:{ADMIN_PASSWORD}".encode("utf-8")
+    ).digest()
+
+
+def _b64encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+
+
+def _b64decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(value + padding)
+
+
+def create_session_token() -> str:
+    expires_at = int(time.time()) + SESSION_MAX_AGE
+    payload = f"{ADMIN_USER}|{expires_at}".encode("utf-8")
+    signature = hmac.new(_session_key(), payload, hashlib.sha256).digest()
+    return f"{_b64encode(payload)}.{_b64encode(signature)}"
+
+
+def session_is_valid(token: str | None) -> bool:
+    if not token or not ADMIN_USER or not ADMIN_PASSWORD:
         return False
 
     try:
-        scheme, encoded_credentials = authorization.split(" ", 1)
-        if scheme.lower() != "basic":
+        payload_part, signature_part = token.split(".", 1)
+        payload = _b64decode(payload_part)
+        signature = _b64decode(signature_part)
+        expected_signature = hmac.new(
+            _session_key(), payload, hashlib.sha256
+        ).digest()
+
+        if not hmac.compare_digest(signature, expected_signature):
             return False
 
-        decoded = base64.b64decode(encoded_credentials, validate=True).decode("utf-8")
-        username, password = decoded.split(":", 1)
+        username, expires_text = payload.decode("utf-8").rsplit("|", 1)
+        return (
+            hmac.compare_digest(
+                username.encode("utf-8"), ADMIN_USER.encode("utf-8")
+            )
+            and int(expires_text) >= int(time.time())
+        )
     except (ValueError, UnicodeDecodeError):
         return False
 
+
+def login_is_valid(username: str, password: str) -> bool:
     return (
-        hmac.compare_digest(username.encode("utf-8"), ADMIN_USER.encode("utf-8"))
-        and hmac.compare_digest(password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8"))
+        bool(ADMIN_USER and ADMIN_PASSWORD)
+        and hmac.compare_digest(
+            username.encode("utf-8"), ADMIN_USER.encode("utf-8")
+        )
+        and hmac.compare_digest(
+            password.encode("utf-8"), ADMIN_PASSWORD.encode("utf-8")
+        )
     )
+
+
+def safe_next_path(value: str | None) -> str:
+    if value and value.startswith("/") and not value.startswith("//"):
+        return value
+    return "/"
+
+
+def login_page(next_path: str = "/", error: str = "") -> str:
+    safe_next = html.escape(safe_next_path(next_path), quote=True)
+    error_html = (
+        f'<div class="error">{html.escape(error)}</div>' if error else ""
+    )
+    return f"""<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso | Cotizador SEACI</title>
+  <style>
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font-family: Arial, sans-serif; color: #20252b;
+      background: linear-gradient(145deg, #12171c, #263039);
+    }}
+    .card {{
+      width: min(92vw, 410px); background: #fff; border-radius: 16px;
+      padding: 34px; box-shadow: 0 22px 60px rgba(0,0,0,.38);
+    }}
+    .brand {{ color: #84bd00; font-size: 26px; font-weight: 800; }}
+    h1 {{ margin: 8px 0 6px; font-size: 23px; }}
+    p {{ margin: 0 0 24px; color: #66717c; }}
+    label {{ display: block; margin: 14px 0 6px; font-weight: 700; }}
+    input {{
+      width: 100%; padding: 12px 13px; border: 1px solid #cbd2d8;
+      border-radius: 9px; font-size: 16px;
+    }}
+    input:focus {{ outline: 3px solid rgba(132,189,0,.22); border-color: #84bd00; }}
+    button {{
+      width: 100%; margin-top: 22px; padding: 12px; border: 0;
+      border-radius: 9px; background: #84bd00; color: #111;
+      font-weight: 800; font-size: 16px; cursor: pointer;
+    }}
+    button:hover {{ background: #96d600; }}
+    .error {{
+      margin: 0 0 14px; padding: 10px 12px; border-radius: 8px;
+      background: #fde8e8; color: #a21c1c;
+    }}
+    .foot {{ margin-top: 20px; text-align: center; font-size: 12px; color: #87919a; }}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">⚡ SEACI</div>
+    <h1>Acceso al cotizador</h1>
+    <p>Ingresa tus credenciales de administrador.</p>
+    {error_html}
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{safe_next}">
+      <label for="username">Usuario</label>
+      <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+      <label for="password">Contraseña</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit">Entrar</button>
+    </form>
+    <div class="foot">Servicios Eléctricos, Automatización y Control Industrial</div>
+  </main>
+</body>
+</html>"""
 
 # Configura tus credenciales de Supabase (usa variables de entorno o colócalas directamente)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://groeopgrcwrdwezosihk.supabase.co")
@@ -49,24 +165,22 @@ templates = Jinja2Templates(directory="templates")
 
 @app.middleware("http")
 async def protect_cotizador(request: Request, call_next):
-    # Render puede consultar esta ruta para verificar que el servicio siga activo.
-    if request.url.path == "/health":
-        return await call_next(request)
+    path = request.url.path
 
-    if not ADMIN_USER or not ADMIN_PASSWORD:
+    if path != "/health" and (not ADMIN_USER or not ADMIN_PASSWORD):
         return PlainTextResponse(
             "Falta configurar ADMIN_USER y ADMIN_PASSWORD en Render.",
             status_code=503,
         )
 
-    if not basic_auth_is_valid(request.headers.get("Authorization")):
-        return PlainTextResponse(
-            "Acceso restringido al Cotizador SEACI.",
-            status_code=401,
-            headers={
-                "WWW-Authenticate": 'Basic realm="Cotizador SEACI", charset="UTF-8"',
-                "Cache-Control": "no-store",
-            },
+    public_paths = {"/health", "/login"}
+    if path not in public_paths and not session_is_valid(
+        request.cookies.get(SESSION_COOKIE)
+    ):
+        next_path = quote(safe_next_path(path), safe="/")
+        return RedirectResponse(
+            url=f"/login?next={next_path}",
+            status_code=303,
         )
 
     response = await call_next(request)
@@ -80,6 +194,49 @@ async def protect_cotizador(request: Request, call_next):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_form(request: Request, next: str = "/"):
+    if session_is_valid(request.cookies.get(SESSION_COOKIE)):
+        return RedirectResponse(url=safe_next_path(next), status_code=303)
+    return HTMLResponse(login_page(next_path=next))
+
+
+@app.post("/login", response_class=HTMLResponse)
+def login_submit(
+    username: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/"),
+):
+    destination = safe_next_path(next)
+    if not login_is_valid(username, password):
+        return HTMLResponse(
+            login_page(
+                next_path=destination,
+                error="Usuario o contraseña incorrectos.",
+            ),
+            status_code=401,
+        )
+
+    response = RedirectResponse(url=destination, status_code=303)
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=create_session_token(),
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    return response
 
 from collections import defaultdict
 
